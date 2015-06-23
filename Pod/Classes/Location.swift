@@ -18,7 +18,7 @@ enum ListenerOption {
 }
 
 
-public class LocationListener : Equatable {
+@objc public class LocationListener : Equatable {
     var manager: LocationManager?
     let id: Int64
     let type: ListenerType
@@ -47,6 +47,7 @@ public func ==(lhs:LocationListener, rhs:LocationListener) -> Bool {
     return lhs.id == rhs.id
 }
 
+var _private_queue = "falocation.event.queue"
 
 class LocationManager : NSObject {
     
@@ -62,7 +63,7 @@ class LocationManager : NSObject {
         }
     }
     
-    
+    var queue : dispatch_queue_t = dispatch_queue_create(_private_queue, nil)
     var lock : NSLock = NSLock()
     var listeners: [LocationListener] = []
     
@@ -177,20 +178,34 @@ extension LocationManager : CLLocationManagerDelegate {
         let geocoder = CLGeocoder()
         
         geocoder.reverseGeocodeLocation(location, completionHandler: { (placemarks, error) in
-            self.handle_geocode(placemarks, error: error, block: block)
+            dispatch_sync(self.queue) {
+                self.handle_geocode(placemarks, error: error, block: block)
+            }
+            
         })
     }
     
     func address(#string: String, block: AddressUpdateHandler) {
         let geocoder = CLGeocoder()
         
+        
         geocoder.geocodeAddressString(string, completionHandler: { (placemarks, error) in
-            self.handle_geocode(placemarks, error: error, block: block)
+           dispatch_sync(self.queue, { () -> Void in
+                self.handle_geocode(placemarks, error: error, block: block)
+           })
+            
         })
+        
+        
         
     }
     
     private func handle_geocode (placemarks: [AnyObject]!, error: NSError?, block: AddressUpdateHandler) {
+        
+        if placemarks == nil {
+            return
+        }
+        
         var err : NSError? = error
         var address : Address? = nil
         if placemarks.count == 0 {
@@ -198,36 +213,51 @@ extension LocationManager : CLLocationManagerDelegate {
         } else {
             let placemark = placemarks.first as? CLPlacemark
             if placemark != nil {
-                address = Address(placemark: placemark!)
+                
+                
+                if placemark!.country != nil && placemark!.ISOcountryCode != nil {
+                    address = Address(placemark: placemark!)
+                }
+                
+                
             }
             
             
         }
-        block(error: err, address: address)
+        dispatch_async(dispatch_get_main_queue()) {
+            block(error: err, address: address)
+        }
+        
     }
 
     func locationManager(manager: CLLocationManager!, didUpdateToLocation newLocation: CLLocation!, fromLocation oldLocation: CLLocation!) {
         
-        if (oldLocation != nil && oldLocation == newLocation) {
-            return
-        }
-        
-        let listeners = self.listeners
-        
-        for listener in listeners {
-            switch (listener.type) {
-            case let .Location(handler):
-                handler(error: nil, location: newLocation)
-            default:
-                continue
+        dispatch_sync(queue){
+            if (oldLocation != nil && oldLocation == newLocation) {
+                return
             }
             
-            if listener.once {
-                let i = find(self.listeners, listener)
-                self.unlisten(listener)
-            }
+            let listeners = self.listeners
             
+            for listener in listeners {
+                switch (listener.type) {
+                case let .Location(handler):
+                    dispatch_async(dispatch_get_main_queue()) {
+                        handler(error: nil, location: newLocation)
+                    }
+                    
+                default:
+                    continue
+                }
+                
+                if listener.once {
+                    let i = find(self.listeners, listener)
+                    self.unlisten(listener)
+                }
+                
+            }
         }
+        
         
 
         

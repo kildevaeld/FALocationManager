@@ -88,7 +88,7 @@ public final class FALocationManager : NSObject {
     
     public static var canLocate : Bool {
         let aCode = CLLocationManager.authorizationStatus()
-        return (aCode == .AuthorizedAlways || aCode == .AuthorizedAlways ) && CLLocationManager.locationServicesEnabled()
+        return (aCode == .AuthorizedAlways || aCode == .AuthorizedAlways || aCode == .NotDetermined ) && CLLocationManager.locationServicesEnabled()
     }
     
     public static var location: CLLocation? {
@@ -112,6 +112,10 @@ public final class FALocationManager : NSObject {
                 FALocationManager.stop()
                 self.once = false
             }
+        })
+        
+        self.manager.listen(false, address: { (error, address) in
+            self.address = address
         })
         
         self.once = false
@@ -174,6 +178,10 @@ public final class FALocationManager : NSObject {
         }
     }
     
+    static public func address(#string: String, block: AddressUpdateHandler) {
+        self.shared.manager.address(string: string, block: block)
+    }
+    
     static public func location(block: LocationUpdateHandler) {
         if self.location != nil {
             block(error: nil, location: self.location!)
@@ -188,15 +196,18 @@ public final class FALocationManager : NSObject {
         self.shared.manager.listen(true, location: block)
     }
     
-    static public func listen(block: LocationUpdateHandler) -> LocationListener {
-        if self.location != nil {
-            block(error: nil, location: self.location!)
+    @objc static public func listen(block: LocationUpdateHandler) -> LocationListener {
+        if self.shared.location != nil {
+            block(error: nil, location: self.shared.location!)
         }
         
         return self.shared.manager.listen(false, location:block)
     }
 
-    static public func listen(#address: AddressUpdateHandler) -> LocationListener {
+    @objc static public func listen(#address: AddressUpdateHandler) -> LocationListener {
+        if self.shared.address != nil {
+            address(error:nil, address: self.shared.address)
+        }
         return self.shared.manager.listen(false, address: address)
     }
     
