@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		1FAD4C9363999A356F2055B3 /* Pods_FALocationManager_Example.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D12FAA27C04C793C0AF94309 /* Pods_FALocationManager_Example.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
+		3A5744E31B38809000DE97FD /* AddressBook.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3A5744E21B38809000DE97FD /* AddressBook.framework */; };
+		3A5744E81B388D9700DE97FD /* MapKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3A5744E71B388D9700DE97FD /* MapKit.framework */; };
 		607FACD61AFB9204008FA782 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 607FACD51AFB9204008FA782 /* AppDelegate.swift */; };
 		607FACD81AFB9204008FA782 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 607FACD71AFB9204008FA782 /* ViewController.swift */; };
 		607FACDB1AFB9204008FA782 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 607FACD91AFB9204008FA782 /* Main.storyboard */; };
@@ -30,6 +32,8 @@
 /* Begin PBXFileReference section */
 		0708755CEA3E28CEAE4010E0 /* FALocationManager.podspec */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = FALocationManager.podspec; path = ../FALocationManager.podspec; sourceTree = "<group>"; };
 		387C380FB25147EE0A1D2DAE /* README.md */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = net.daringfireball.markdown; name = README.md; path = ../README.md; sourceTree = "<group>"; };
+		3A5744E21B38809000DE97FD /* AddressBook.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AddressBook.framework; path = System/Library/Frameworks/AddressBook.framework; sourceTree = SDKROOT; };
+		3A5744E71B388D9700DE97FD /* MapKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MapKit.framework; path = System/Library/Frameworks/MapKit.framework; sourceTree = SDKROOT; };
 		4AF773FCC0418150498F1A7F /* LICENSE */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = LICENSE; path = ../LICENSE; sourceTree = "<group>"; };
 		5688084EF72F57590127B194 /* Pods-FALocationManager_Tests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-FALocationManager_Tests.release.xcconfig"; path = "Pods/Target Support Files/Pods-FALocationManager_Tests/Pods-FALocationManager_Tests.release.xcconfig"; sourceTree = "<group>"; };
 		607FACD01AFB9204008FA782 /* FALocationManager_Example.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FALocationManager_Example.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -39,7 +43,7 @@
 		607FACDA1AFB9204008FA782 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		607FACDC1AFB9204008FA782 /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Images.xcassets; sourceTree = "<group>"; };
 		607FACDF1AFB9204008FA782 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/LaunchScreen.xib; sourceTree = "<group>"; };
-		607FACE51AFB9204008FA782 /* Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = Tests.xctest; path = FALocationManager_Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		607FACE51AFB9204008FA782 /* FALocationManager_Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FALocationManager_Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		607FACEA1AFB9204008FA782 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		607FACEB1AFB9204008FA782 /* Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests.swift; sourceTree = "<group>"; };
 		646110556F96314947ED2237 /* Pods-FALocationManager_Example.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-FALocationManager_Example.release.xcconfig"; path = "Pods/Target Support Files/Pods-FALocationManager_Example/Pods-FALocationManager_Example.release.xcconfig"; sourceTree = "<group>"; };
@@ -54,6 +58,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3A5744E81B388D9700DE97FD /* MapKit.framework in Frameworks */,
+				3A5744E31B38809000DE97FD /* AddressBook.framework in Frameworks */,
 				1FAD4C9363999A356F2055B3 /* Pods_FALocationManager_Example.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -85,7 +91,7 @@
 			isa = PBXGroup;
 			children = (
 				607FACD01AFB9204008FA782 /* FALocationManager_Example.app */,
-				607FACE51AFB9204008FA782 /* Tests.xctest */,
+				607FACE51AFB9204008FA782 /* FALocationManager_Tests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -153,6 +159,8 @@
 		F5E7769C0EE0CDFDC0C3B401 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				3A5744E71B388D9700DE97FD /* MapKit.framework */,
+				3A5744E21B38809000DE97FD /* AddressBook.framework */,
 				D12FAA27C04C793C0AF94309 /* Pods_FALocationManager_Example.framework */,
 				EBBBDEE61BA8C40D79913625 /* Pods_FALocationManager_Tests.framework */,
 			);
@@ -200,7 +208,7 @@
 			);
 			name = FALocationManager_Tests;
 			productName = Tests;
-			productReference = 607FACE51AFB9204008FA782 /* Tests.xctest */;
+			productReference = 607FACE51AFB9204008FA782 /* FALocationManager_Tests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
