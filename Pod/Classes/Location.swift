@@ -9,43 +9,36 @@
 import Foundation
 import MapKit
 
-enum ListenerType {
-    case Address(AddressUpdateHandler), Location(LocationUpdateHandler)
+func synchronized (lock: AnyObject, block: () -> Void) {
+    objc_sync_enter(lock)
+    block()
+    objc_sync_exit(lock)
 }
 
-enum ListenerOption {
-    case None, TTL(NSTimeInterval), Once
+func synchronize<T>(lock: AnyObject, block: () -> T?) -> T? {
+    let out : T?
+    objc_sync_enter(lock)
+    out = block()
+    objc_sync_exit(lock)
+    return out
 }
 
+func mainQueue (fn: () -> Void ) {
+    mainQueue(true, fn)
+}
 
-@objc public class LocationListener : Equatable {
-    var manager: LocationManager?
-    let id: Int64
-    let type: ListenerType
-    var once: Bool = false
-    
-    init (id: Int64, type: ListenerType, once: Bool) {
-        self.id = id
-        self.type = type
-        self.once = once
-    }
-    
-    public func unlisten () {
-        self.manager?.unlisten(self)
-    }
-    
-    public func listen () {
-       self.manager?.listen(self)
-    }
-    
-    deinit {
-        self.unlisten()
+func mainQueue (async: Bool, fn: () -> Void) {
+    if async {
+        dispatch_async(dispatch_get_main_queue(), fn)
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), fn)
     }
 }
 
-public func ==(lhs:LocationListener, rhs:LocationListener) -> Bool {
-    return lhs.id == rhs.id
-}
+
+
+
+
 
 var _private_queue = "falocation.event.queue"
 
@@ -55,24 +48,54 @@ class LocationManager : NSObject {
         private static let lock = NSLock()
         private static var _id : Int64 = 0
         static func get_id() -> Int64 {
-            let id : Int64
-            self.lock.lock()
-            id = ++_id
-            self.lock.unlock()
-            return id
+            return ++self._id
         }
     }
     
     var queue : dispatch_queue_t = dispatch_queue_create(_private_queue, nil)
-    var lock : NSLock = NSLock()
+    var queue2 : dispatch_queue_t = dispatch_queue_create("private", nil)
     var listeners: [LocationListener] = []
     
+    private var _location : CLLocation?
+    private var _address : Address?
+    
+    var location: CLLocation? {
+        get {
+            var loc : CLLocation?
+            dispatch_sync(self.queue2) { ()
+                loc = self._location
+            }
+            return loc
+        }
+        set (loc) {
+            dispatch_barrier_async(self.queue2) {
+                self._location = loc
+            }
+        }
+    }
+    var address: Address? {
+        get {
+            var addr : Address?
+            dispatch_sync(self.queue2) {
+                addr = self._address
+            }
+            return addr
+        }
+        
+        set (addr) {
+            dispatch_barrier_async(self.queue2) {
+                self._address = addr
+            }
+        }
+    }
+    
+    private var error: NSError?
     
     private func listen(once: Bool, _ handler: ListenerType ) -> LocationListener? {
         let id = idgen.get_id()
         
-        let listener = LocationListener(id: id, type: handler, once: once)
-        self.listen(listener)
+        let listener = LocationListener(manager: self, id: id, type: handler, once: once)
+        listener.listen()
         
         return listener
     }
@@ -81,18 +104,26 @@ class LocationManager : NSObject {
         
         var ret : Bool = false
         
-        if listener.manager != nil && listener.manager! !== self {
-            listener.unlisten()
-        }
-        
-        listener.manager = self
-        
-        self.lock.lock()
         if !contains(self.listeners, listener) {
             self.listeners.append(listener)
             ret = true
         }
-        self.lock.unlock()
+        
+        let currentLocation = self.location
+        let currentAddress = self.address
+        let error : NSError?
+        
+        if currentLocation != nil {
+            listener.emit(self.error, args: currentLocation)
+        }
+        
+        if address != nil {
+            listener.emit(self.error, args: address)
+        }
+        
+        if self.error != nil {
+            listener.emit(self.error, args: nil)
+        }
         
         return ret
     }
@@ -108,7 +139,6 @@ class LocationManager : NSObject {
     func unlisten(_ listener: LocationListener? = nil) -> Bool {
         
         var ret: Bool = false
-        self.lock.lock()
         
         if listener == nil {
             self.listeners = []
@@ -120,17 +150,18 @@ class LocationManager : NSObject {
             }
         }
         
-        self.lock.unlock()
         return ret
     }
 }
 
 extension LocationManager : CLLocationManagerDelegate {
     struct state {
-        static var addressListener : LocationListener?
+        //static var addressListener : LocationListener?
+        static var isResolvingAddress: Bool = false
+        static var lastAddressResolving: NSTimeInterval = 0
+        static var cache = AddressCache()
+        static var queue = Queue()
     }
-    
-    
     
     var canLocate: Bool {
         let aCode = CLLocationManager.authorizationStatus()
@@ -138,7 +169,7 @@ extension LocationManager : CLLocationManagerDelegate {
     }
     
     
-    func startUpdatingAddress() {
+    /*func startUpdatingAddress() {
         var lastLocation : CLLocation?
         
         if state.addressListener != nil {
@@ -147,24 +178,23 @@ extension LocationManager : CLLocationManagerDelegate {
         
         state.addressListener = self.listen(false, location: { (error, location)  in
             
+            
             if location == nil { return }
             if lastLocation != nil && lastLocation!.compare(location!, precision: 200.0) { return }
             
             self.address(location!, block: { (error, address) in
-                lastLocation = location
-                let listeners = self.listeners
-                
-                for listener in listeners {
-                    switch (listener.type) {
-                    case let .Address(handler):
-                        handler(error: error, address: address)
-                    default:
-                        continue
+                dispatch_async(self.queue) {
+                    lastLocation = location
+                    let listeners = self.listeners
+                    if address != nil {
+                        self.address = address
                     }
-                    if listener.once {
-                        self.unlisten(listener)
+                    
+                    for listener in listeners {
+                        listener.emit(error, args: address)
                     }
                 }
+                
             })
         })
     }
@@ -172,35 +202,126 @@ extension LocationManager : CLLocationManagerDelegate {
     func stopUpdatingAddress () {
         state.addressListener?.unlisten()
         state.addressListener = nil
-    }
+    }*/
     
     func address(location: CLLocation, block: AddressUpdateHandler) {
+        
+        if !NSThread.currentThread().isMainThread {
+            mainQueue {
+                self.address(location, block: block)
+            }
+            return
+        }
+        
+        if let address = state.cache.get(location) {
+            block(error: nil, address: address)
+            return
+        }
+        
+        if !addressCheck() {
+            block(error: nil, address: nil)
+            return
+        }
+        
+        
+        
+        state.isResolvingAddress = true
+        state.lastAddressResolving = NSDate().timeIntervalSince1970
+        
         let geocoder = CLGeocoder()
         
         geocoder.reverseGeocodeLocation(location, completionHandler: { (placemarks, error) in
-            dispatch_sync(self.queue) {
-                self.handle_geocode(placemarks, error: error, block: block)
-            }
             
+            self.handle_geocode(placemarks, error: error, block:block)
+            state.cache.save()
         })
     }
     
     func address(#string: String, block: AddressUpdateHandler) {
+        
+        if !NSThread.currentThread().isMainThread {
+            mainQueue {
+                self.address(string: string, block: block)
+            }
+            return
+        }
+        
+        if let address = state.cache.get(string) {
+            block(error: nil, address: address)
+            return
+        }
+        
+        if state.isResolvingAddress {
+            state.queue.push(string, handler: block)
+            //block(error: nil, address: nil)
+            return
+        } /*else if (NSDate().timeIntervalSince1970 - state.lastAddressResolving) < 10 {
+            state.queue.push(string, handler: block)
+        }*/
+        
+        state.isResolvingAddress = true
+        state.lastAddressResolving = NSDate().timeIntervalSince1970
+        
         let geocoder = CLGeocoder()
         
-        
         geocoder.geocodeAddressString(string, completionHandler: { (placemarks, error) in
-           dispatch_sync(self.queue, { () -> Void in
-                self.handle_geocode(placemarks, error: error, block: block)
-           })
+    
+            self.handle_geocode(placemarks, error: error, block: { (error, address) in
+                
+                if address != nil {
+                    state.cache.set(string, address:address!)
+                    state.cache.save()
+                }
+                
+                block(error: error, address: address)
+                
+                var handlers: [AddressUpdateHandler] = []
+                
+                handlers = state.queue.pop(string)
+                if address != nil {
+                    handlers += state.queue.pop(address!.location)
+                }
+                
+                for handler in handlers {
+                    handler(error:error, address:address)
+                }
+             
+                if let item = state.queue.pop() {
+                    if item.key != nil {
+                        self.address(string: item.key!, block: item.handler)
+                    } else {
+                        self.address(item.location!, block: item.handler)
+                    }
+                }
+                
+            })
             
         })
+    }
+    
+    func address(#city: City, block: AddressUpdateHandler) {
         
+        self.address(string: "\(city.name), \(city.country.name)", block: block)
+    }
+    
+    func addressCheck() -> Bool {
         
+        let now = NSDate().timeIntervalSince1970
+        if state.isResolvingAddress {
+            println("already resolving address")
+            return false
+        } else if now - state.lastAddressResolving < 10 {
+            println("can only get address every 20th sec \(now - state.lastAddressResolving)")
+            return false
+        }
         
+        return true
     }
     
     private func handle_geocode (placemarks: [AnyObject]!, error: NSError?, block: AddressUpdateHandler) {
+        
+        state.isResolvingAddress = false
+        
         
         if placemarks == nil {
             return
@@ -213,48 +334,37 @@ extension LocationManager : CLLocationManagerDelegate {
         } else {
             let placemark = placemarks.first as? CLPlacemark
             if placemark != nil {
-                
-                
                 if placemark!.country != nil && placemark!.ISOcountryCode != nil {
                     address = Address(placemark: placemark!)
                 }
-                
-                
             }
             
-            
-        }
-        dispatch_async(dispatch_get_main_queue()) {
-            block(error: err, address: address)
         }
         
+        if address != nil {
+            state.cache.set(address!)
+        }
+        
+        block(error: err, address: address)
+        
+    
     }
 
     func locationManager(manager: CLLocationManager!, didUpdateToLocation newLocation: CLLocation!, fromLocation oldLocation: CLLocation!) {
         
-        dispatch_sync(queue){
-            if (oldLocation != nil && oldLocation == newLocation) {
-                return
-            }
+        if (oldLocation != nil && oldLocation == newLocation) {
+            return
+        }
+        
+        dispatch_async(queue){
+            
+            self.location = newLocation
+            self.error = nil
             
             let listeners = self.listeners
             
             for listener in listeners {
-                switch (listener.type) {
-                case let .Location(handler):
-                    dispatch_async(dispatch_get_main_queue()) {
-                        handler(error: nil, location: newLocation)
-                    }
-                    
-                default:
-                    continue
-                }
-                
-                if listener.once {
-                    let i = find(self.listeners, listener)
-                    self.unlisten(listener)
-                }
-                
+                listener.emit(nil, args: newLocation)
             }
         }
         
@@ -268,19 +378,12 @@ extension LocationManager : CLLocationManagerDelegate {
         
         let listeners = self.listeners
         
+        self.error = error
+        self.location = nil
+        self.address = nil
+        
         for listener in listeners {
-            switch (listener.type) {
-            case let .Location(handler):
-                handler(error: error, location: nil)
-            default:
-                continue
-            }
-            
-            if listener.once {
-                let i = find(self.listeners, listener)
-                self.unlisten(listener)
-            }
-            
+            listener.emit(error, args: nil)
         }
     }
     

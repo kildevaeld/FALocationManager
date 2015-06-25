@@ -11,9 +11,13 @@ import MapKit
 import AddressBook
 
 @objc public class City : NSObject, Hashable, Printable {
+    var _address: Address?
+    
     dynamic public let name: String
     dynamic public let country: Country
-    
+    dynamic public var address: Address? {
+        return _address
+    }
     public override var hashValue : Int {
         return self.name.hashValue ^ self.country.hashValue
     }
@@ -23,13 +27,27 @@ import AddressBook
         self.country = country
     }
     
+    
     public func location(handler:LocationUpdateHandler) {
-        FALocationManager.shared.manager.address(string: "\(self.name), \(self.country.name)", block: { (error, address) in
-            handler(error: error, location: address?.location)
-        })
+        if self._address != nil {
+            handler(error: nil, location: _address!.location)
+        } else {
+            self.resolveAddress({ (error, address) -> Void in
+                handler(error: error, location: address?.location)
+            })
+        }
     }
     
-    
+    public func resolveAddress(handler:AddressUpdateHandler) {
+        if _address != nil {
+            handler(error: nil, address: _address)
+            return;
+        }
+        FALocationManager.shared.manager.address(city: self, block: { (error, address) in
+            self._address = address
+            handler(error: error, address: address)
+        })
+    }
 }
 
 public func ==(lhs: City, rhs: City) -> Bool {
@@ -61,7 +79,48 @@ public func ==(lhs: Country, rhs: Country) -> Bool {
     return lhs.iso == rhs.iso
 }
 
-@objc public class Address : NSObject, MKAnnotation {
+@objc public class Address : NSObject, MKAnnotation, NSCoding {
+    
+    struct AddressCoding {
+        static let City = "city", Country = "country", Iso = "isoCode", ZipCode = "zipCode", Street = "street",
+        Latitude = "latitude", Longitude = "longitude"
+    }
+    
+    public required init(coder aDecoder: NSCoder) {
+        let cityName  = aDecoder.decodeObjectForKey(AddressCoding.City) as? String
+        let countryName = aDecoder.decodeObjectForKey(AddressCoding.Country) as? String
+        let isoCode  = aDecoder.decodeObjectForKey(AddressCoding.Iso) as? String
+        let zipCode  = aDecoder.decodeObjectForKey(AddressCoding.ZipCode) as? String
+        let latitude = aDecoder.decodeDoubleForKey(AddressCoding.Latitude)
+        let longitude = aDecoder.decodeDoubleForKey(AddressCoding.Longitude) as Double
+        let street = aDecoder.decodeObjectForKey(AddressCoding.Street) as? String
+        
+        let country = Country(isoCode!, name: countryName!)
+        let city = City(cityName!, country: country)
+        
+        let location = CLLocationCoordinate2DMake(latitude, longitude)
+        
+        //self.init(city: city, street: street, zipCode: zipCode, coordinate: location)
+        self.city = city
+        self.country = country
+        self.street = street
+        self.zipCode = zipCode
+        self.coordinate = location
+        
+    }
+    
+    public func encodeWithCoder(aCoder: NSCoder) {
+        aCoder.encodeObject(self.city.name, forKey: AddressCoding.City)
+        aCoder.encodeObject(self.country.name, forKey: AddressCoding.Country)
+        aCoder.encodeObject(self.country.iso, forKey: AddressCoding.Iso)
+        aCoder.encodeObject(self.street, forKey: AddressCoding.Street)
+        aCoder.encodeObject(self.zipCode, forKey: AddressCoding.ZipCode)
+        aCoder.encodeDouble(self.coordinate.latitude, forKey: AddressCoding.Latitude)
+        aCoder.encodeDouble(self.coordinate.longitude, forKey: AddressCoding.Longitude)
+    }
+
+    
+    
     public var title: String?
     
     public var coordinate: CLLocationCoordinate2D
@@ -101,6 +160,8 @@ public func ==(lhs: Country, rhs: Country) -> Bool {
         self.zipCode = zipCode
         
     }
+
+    
     
     public convenience init(placemark:CLPlacemark) {
         
@@ -110,9 +171,8 @@ public func ==(lhs: Country, rhs: Country) -> Bool {
         self.init(city:city, street: street, zipCode:placemark.postalCode, coordinate: placemark.location.coordinate)
         
     }
-    
-    
 }
+
 
 
 

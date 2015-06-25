@@ -8,10 +8,16 @@
 
 import UIKit
 import FALocationManager
+
+func dispatch_after_delay(delay: NSTimeInterval, queue: dispatch_queue_t, block: dispatch_block_t) {
+    let time = dispatch_time(DISPATCH_TIME_NOW, Int64(delay * Double(NSEC_PER_SEC)))
+    dispatch_after(time, queue, block)
+}
+
 class ViewController: UIViewController {
     
     @IBOutlet var label : UILabel?
-    
+    var queue = dispatch_queue_create("test", DISPATCH_QUEUE_CONCURRENT)
     @IBAction func onButton(sender:UIButton) {
         let selected : Bool
         if sender.selected {
@@ -21,6 +27,16 @@ class ViewController: UIViewController {
             self.listener?.listen()
             selected = true
         }
+        
+        
+        
+        dispatch_after_delay(5, self.queue) { () -> Void in
+            FALocationManager.address(string: "København, Danmark", block: { (error, address) -> Void in
+                
+                println("\(address)")
+            })
+        }
+        
         sender.selected = selected
     }
     

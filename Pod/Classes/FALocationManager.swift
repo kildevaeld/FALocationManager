@@ -35,56 +35,15 @@ extension NSLock {
 
 public final class FALocationManager : NSObject {
     
-    /*struct settings {
-        static let lock = NSLock()
-        static var _id : Int64 = 0
-        static func get_id() -> Int64 {
-            let id : Int64
-            self.lock.lock()
-            id = ++_id
-            self.lock.unlock()
-            return id
-        }
-    }**/
+    
     
     public static let shared = FALocationManager()
     
     let manager : LocationManager
-    let locationManager : CLLocationManager
-    //var listeners : [Listener] = []
+    public let locationManager : CLLocationManager
     
-    var location: CLLocation?
-    var address: Address?
-    
-    var lock : NSLock = NSLock()
-    
-    private var _state : State = .None
-    var state : State  {
-        get {
-            return lock.lock {
-                return self._state
-            }
-        }
-        set (val) {
-            lock.lock { () -> Void in
-                self._state = val
-            }
-        }
-    }
-    var _once : Bool?
-    var once : Bool {
-        set (value) {
-            lock.lock {
-                self._once = value
-            }
-        }
-        get {
-            return lock.lock {
-                return self._once == nil ? false : self._once!
-            }
-        }
-    }
-    
+    var state : State = .None
+    var once : Bool = false
     
     public static var canLocate : Bool {
         let aCode = CLLocationManager.authorizationStatus()
@@ -92,9 +51,12 @@ public final class FALocationManager : NSObject {
     }
     
     public static var location: CLLocation? {
-        return FALocationManager.shared.location
+        return self.shared.manager.location
     }
     
+    public static var address: Address? {
+        return self.shared.manager.address
+    }
     
     
     
@@ -107,15 +69,11 @@ public final class FALocationManager : NSObject {
         super.init()
         
         self.manager.listen(false, location: { (error, location) -> Void in
-            self.location = location
+            
             if self.once {
                 FALocationManager.stop()
                 self.once = false
             }
-        })
-        
-        self.manager.listen(false, address: { (error, address) in
-            self.address = address
         })
         
         self.once = false
@@ -123,13 +81,13 @@ public final class FALocationManager : NSObject {
         
     }
     
-    public static func startUpdatingAddress () {
+    /*public static func startUpdatingAddress () {
         self.shared.manager.startUpdatingAddress()
     }
     
     public static func stopUpdatingAddress () {
         self.shared.manager.stopUpdatingAddress()
-    }
+    }*/
     
     public static func start () {
         let manager = self.shared.locationManager
@@ -183,10 +141,6 @@ public final class FALocationManager : NSObject {
     }
     
     static public func location(block: LocationUpdateHandler) {
-        if self.location != nil {
-            block(error: nil, location: self.location!)
-            return
-        }
         
         if self.shared.state == .None {
             self.shared.once = true
@@ -197,16 +151,12 @@ public final class FALocationManager : NSObject {
     }
     
     @objc static public func listen(block: LocationUpdateHandler) -> LocationListener {
-        if self.shared.location != nil {
-            block(error: nil, location: self.shared.location!)
-        }
-        
         return self.shared.manager.listen(false, location:block)
     }
 
     @objc static public func listen(#address: AddressUpdateHandler) -> LocationListener {
-        if self.shared.address != nil {
-            address(error:nil, address: self.shared.address)
+        if self.address != nil {
+            address(error:nil, address: self.address)
         }
         return self.shared.manager.listen(false, address: address)
     }
