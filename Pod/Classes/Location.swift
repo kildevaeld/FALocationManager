@@ -310,7 +310,7 @@ extension LocationManager : CLLocationManagerDelegate {
         if state.isResolvingAddress {
             println("already resolving address")
             return false
-        } else if now - state.lastAddressResolving < 10 {
+        } else if now - state.lastAddressResolving < 5 {
             println("can only get address every 20th sec \(now - state.lastAddressResolving)")
             return false
         }
