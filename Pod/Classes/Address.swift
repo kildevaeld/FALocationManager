@@ -150,6 +150,7 @@ public func ==(lhs: Country, rhs: Country) -> Bool {
     
     public let street: String?
     public let zipCode: String?
+    public var context: AnyObject?
     
     public init(city: City, street: String?, zipCode: String?, coordinate: CLLocationCoordinate2D) {
         
